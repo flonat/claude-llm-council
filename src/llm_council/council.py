@@ -111,7 +111,7 @@ class CouncilService:
 
         # Stage 3
         t3 = perf_counter()
-        final_result = await self._stage3_synthesise(
+        final_result, stage3_fallback = await self._stage3_synthesise(
             system_prompt, user_msg, assessments, peer_reviews,
             chairman_model,
             custom_prompt_builder=stage3_prompt_builder,
@@ -133,6 +133,7 @@ class CouncilService:
                 total_ms=total_ms,
                 reused_model=existing_model,
                 aggregate_rankings=aggregate_rankings,
+                stage3_fallback=stage3_fallback,
             ),
         )
 
@@ -284,7 +285,7 @@ Now provide your evaluation and ranking:"""
         chairman_model: str,
         *,
         custom_prompt_builder: object | None = None,
-    ) -> dict:
+    ) -> tuple[dict, bool]:
         if custom_prompt_builder and callable(custom_prompt_builder):
             chairman_prompt = custom_prompt_builder(assessments, peer_reviews, user_msg)
         else:
@@ -321,14 +322,15 @@ Where the council agrees, reflect that consensus. Where they disagree, use your 
 You MUST respond with valid JSON matching the EXACT SAME SCHEMA as the individual assessments above. Respond ONLY with valid JSON."""
 
         try:
-            return await self.llm.chat_json(
+            result = await self.llm.chat_json(
                 system_prompt, chairman_prompt, model=chairman_model,
             )
+            return result, False
         except Exception:
             logger.exception("Council Stage 3: chairman %s failed", chairman_model)
             if assessments:
-                return assessments[0].result_json
-            return {}
+                return assessments[0].result_json, True
+            return {}, True
 
     # ------------------------------------------------------------------
     # Ranking utilities
