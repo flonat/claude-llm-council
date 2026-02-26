@@ -105,10 +105,24 @@ class LLMClient:
         self.json_retry_attempts = max(1, json_retry_attempts)
 
     async def chat_json(
-        self, system: str, user_msg: str, *, model: str | None = None,
+        self,
+        system: str,
+        user_msg: str,
+        *,
+        model: str | None = None,
+        max_tokens: int | None = None,
     ) -> dict:
-        """Send a message and parse a JSON-object response with retries."""
+        """Send a message and parse a JSON-object response with retries.
+
+        Parameters
+        ----------
+        max_tokens:
+            Override the client's default ``max_tokens`` for this call.
+            Useful when the expected JSON response is larger than usual
+            (e.g. council synthesis of a discovery workflow).
+        """
         effective_model = model or self.model
+        effective_max_tokens = max_tokens or self.max_tokens
         prompt = user_msg + "\n\nRespond ONLY with valid JSON."
         raw_text = ""
         parse_error: Exception | None = None
@@ -117,7 +131,7 @@ class LLMClient:
             try:
                 response = await self.client.chat.completions.create(
                     model=effective_model,
-                    max_tokens=self.max_tokens,
+                    max_tokens=effective_max_tokens,
                     messages=[
                         {"role": "system", "content": system},
                         {"role": "user", "content": prompt},
@@ -153,18 +167,29 @@ class LLMClient:
         )
 
     async def chat_text(
-        self, system: str, user_msg: str, *, model: str | None = None,
+        self,
+        system: str,
+        user_msg: str,
+        *,
+        model: str | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         """Query the LLM and return the raw text response (no JSON parsing).
 
         Used for Stage 2 peer review which returns free-form text with a
         FINAL RANKING section.
+
+        Parameters
+        ----------
+        max_tokens:
+            Override the client's default ``max_tokens`` for this call.
         """
         effective_model = model or self.model
+        effective_max_tokens = max_tokens or self.max_tokens
         try:
             response = await self.client.chat.completions.create(
                 model=effective_model,
-                max_tokens=self.max_tokens,
+                max_tokens=effective_max_tokens,
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": user_msg},

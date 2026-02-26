@@ -30,8 +30,9 @@ logger = logging.getLogger(__name__)
 class CouncilService:
     """Orchestrates a multi-model council review."""
 
-    def __init__(self, llm: LLMClient) -> None:
+    def __init__(self, llm: LLMClient, *, max_tokens: int | None = None) -> None:
         self.llm = llm
+        self._max_tokens = max_tokens
 
     async def run_council(
         self,
@@ -170,7 +171,8 @@ class CouncilService:
         async def _query_one(model_id: str) -> CouncilAssessment | None:
             try:
                 result = await self.llm.chat_json(
-                    system_prompt, user_msg, model=model_id,
+                    system_prompt, user_msg,
+                    model=model_id, max_tokens=self._max_tokens,
                 )
                 return CouncilAssessment(
                     model=model_id,
@@ -249,7 +251,8 @@ Now provide your evaluation and ranking:"""
         async def _review_one(model_id: str) -> CouncilPeerReview | None:
             try:
                 text = await self.llm.chat_text(
-                    review_system, review_prompt, model=model_id,
+                    review_system, review_prompt,
+                    model=model_id, max_tokens=self._max_tokens,
                 )
                 parsed = self._parse_ranking_from_text(text)
                 return CouncilPeerReview(
@@ -323,7 +326,8 @@ You MUST respond with valid JSON matching the EXACT SAME SCHEMA as the individua
 
         try:
             result = await self.llm.chat_json(
-                system_prompt, chairman_prompt, model=chairman_model,
+                system_prompt, chairman_prompt,
+                model=chairman_model, max_tokens=self._max_tokens,
             )
             return result, False
         except Exception:
